@@ -439,6 +439,21 @@ conv_handler = ConversationHandler(
 app.add_handler(CommandHandler("start", start))
 app.add_handler(conv_handler)
 
-print("ENHANCED BOT READY WITH INVESTOR TRACKING!")
-print("Open Telegram and send a receipt (photo/file - JPG/PNG/PDF/WEBP)!")
-app.run_polling(drop_pending_updates=True)
+# Check if running on Render (production) or locally
+WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
+PORT = int(os.environ.get('PORT', 5000))
+
+if WEBHOOK_URL:
+    # Production: Use webhooks
+    print("Running in webhook mode for production")
+    app.run_webhook(
+        listen='0.0.0.0',
+        port=PORT,
+        url_path=TELEGRAM_TOKEN,
+        webhook_url=f'{WEBHOOK_URL}/{TELEGRAM_TOKEN}',
+        drop_pending_updates=True
+    )
+else:
+    # Local development: Use polling
+    print("No WEBHOOK_URL found, running in polling mode for local development")
+    app.run_polling(drop_pending_updates=True)
