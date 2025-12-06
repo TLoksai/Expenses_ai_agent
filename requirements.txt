@@ -1,5 +1,5 @@
 groq
-python-telegram-bot
+python-telegram-bot[webhooks]
 gspread
 oauth2client
 gspread-formatting
