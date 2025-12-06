@@ -42,7 +42,7 @@ AWAITING_INVESTOR, AWAITING_CUSTOM_NAME = range(2)
 user_data = {}
 
 # Setup headers with formatting
-headers = ['Date', 'Investor/Person', 'Merchant', 'Total', 'Currency', 'Category', 'Description', 'Items', 'Tax', 'Subtotal', 'Receipt Number', 'Image Link']
+headers = ['Date', 'Investor/Person', 'Merchant', 'Total', 'Currency', 'Tax', 'GST Number', 'SGST', 'CGST', 'Receipt Number', 'Payment Method', 'Payment Status', 'Category', 'Description', 'Items', 'Buyer Email', 'Seller Email', 'Address', 'Image Link']
 current_headers = sheet.row_values(1) if sheet.row_count > 0 else []
 
 if current_headers != headers:
@@ -55,18 +55,25 @@ if current_headers != headers:
         textFormat=TextFormat(bold=True, foregroundColor=Color(1, 1, 1), fontSize=11),
         horizontalAlignment='CENTER'
     )
-    format_cell_range(sheet, 'A1:L1', header_format)
+    format_cell_range(sheet, 'A1:S1', header_format)
 
     # Set column widths
     set_column_width(sheet, 'A', 120)  # Date
     set_column_width(sheet, 'B', 150)  # Investor
     set_column_width(sheet, 'C', 180)  # Merchant
     set_column_width(sheet, 'D:E', 100)  # Total, Currency
-    set_column_width(sheet, 'F', 130)  # Category
-    set_column_width(sheet, 'G', 250)  # Description
-    set_column_width(sheet, 'H', 300)  # Items
-    set_column_width(sheet, 'I:K', 100)  # Tax, Subtotal, Receipt#
-    set_column_width(sheet, 'L', 200)  # Image Link
+    set_column_width(sheet, 'F', 100)  # Tax
+    set_column_width(sheet, 'G', 120)  # GST Number
+    set_column_width(sheet, 'H:I', 100)  # SGST, CGST
+    set_column_width(sheet, 'J', 100)  # Receipt Number
+    set_column_width(sheet, 'K', 120)  # Payment Method
+    set_column_width(sheet, 'L', 100)  # Payment Status
+    set_column_width(sheet, 'M', 130)  # Category
+    set_column_width(sheet, 'N', 250)  # Description
+    set_column_width(sheet, 'O', 300)  # Items
+    set_column_width(sheet, 'P:Q', 150)  # Buyer Email, Seller Email
+    set_column_width(sheet, 'R', 200)  # Address
+    set_column_width(sheet, 'S', 200)  # Image Link
 
 print("CONNECTED & HEADERS SET WITH FORMATTING!")
 
@@ -244,11 +251,23 @@ Extract ALL important details accurately. Use these exact keys:
   "currency": "INR or USD or from text (default INR for Indian receipts)",
   "category": one of "Meals|Travel|Office Supplies|Software|Entertainment|Other",
   "description": "brief 1-sentence summary",
-  "items": "semicolon-separated list e.g. 'White Basic Tank Top: 2 x $100.00 = $200.00; Denim Jacket: 5 x $50.00 = $250.00'",
+  "items": "semicolon-separated list with CORRECT quantities and prices e.g. 'Hyderabadi Dum Chicken Biryani: 1 x 250.00 = 250.00; Andhra Chicken Mini Biryani: 1 x 157.00 = 157.00' - ensure quantities are accurate numbers, not 0",
   "tax": number like 34.50 (GST/VAT/Tax amount),
-  "subtotal": number like 690.00,
-  "receipt_number": "invoice/receipt number if available, else empty"
+  "gst_number": "GST number if available, else empty",
+  "payment_method": "cash/card/online/bank transfer/etc if mentioned, else empty",
+  "receipt_number": "invoice/receipt number if available, else empty",
+  "buyer_email": "buyer's email if available, else empty",
+  "seller_email": "seller's email if available, else empty",
+  "address": "merchant address if available, else empty",
+  "payment_status": "paid/pending/unpaid etc if mentioned, else 'paid'",
+  "sgst": number like 17.25 (SGST amount if INR and available, else 0),
+  "cgst": number like 17.25 (CGST amount if INR and available, else 0)
 }}
+
+IMPORTANT:
+- For items, carefully extract each item with its quantity (must be number > 0) and unit price, calculate subtotal if needed
+- If currency is INR, try to extract SGST and CGST separately
+- Look for email addresses, addresses, payment status in the receipt
 
 IMPORTANT:
 - If merchant not clear, look for shop/company name at top
@@ -303,24 +322,38 @@ Raw text:
                 "description": f"Auto-extraction failed. Raw: {raw_text[:150]}",
                 "items": raw_text[:300] if len(raw_text) > 0 else "No text extracted",
                 "tax": 0,
-                "subtotal": 0,
-                "receipt_number": ""
+                "gst_number": "",
+                "payment_method": "",
+                "receipt_number": "",
+                "buyer_email": "",
+                "seller_email": "",
+                "address": "",
+                "payment_status": "paid",
+                "sgst": 0,
+                "cgst": 0
             }
 
     # Prepare row with investor name
     row = [
         data.get("date", ""),
-        investor_name,  # New column
+        investor_name,
         data.get("merchant", ""),
         data.get("total", 0),
-        data.get("currency", "USD"),
+        data.get("currency", "INR"),
+        data.get("tax", 0),
+        data.get("gst_number", ""),
+        data.get("sgst", 0),
+        data.get("cgst", 0),
+        data.get("receipt_number", ""),
+        data.get("payment_method", ""),
+        data.get("payment_status", "paid"),
         data.get("category", ""),
         data.get("description", ""),
         data.get("items", ""),
-        data.get("tax", 0),
-        data.get("subtotal", 0),
-        data.get("receipt_number", ""),
-        image_link  # Store image link
+        data.get("buyer_email", ""),
+        data.get("seller_email", ""),
+        data.get("address", ""),
+        image_link
     ]
 
     # Append to sheet
@@ -334,12 +367,13 @@ Raw text:
         row_color = Color(1, 1, 1)  # White
 
     row_format = CellFormat(backgroundColor=row_color)
-    format_cell_range(sheet, f'A{row_number}:L{row_number}', row_format)
+    format_cell_range(sheet, f'A{row_number}:S{row_number}', row_format)
 
     # Format currency columns
-    currency_format = CellFormat(numberFormat=NumberFormat(type='CURRENCY', pattern='$#,##0.00'))
+    currency_format = CellFormat(numberFormat=NumberFormat(type='CURRENCY', pattern='₹#,##0.00'))
     format_cell_range(sheet, f'D{row_number}', currency_format)  # Total
-    format_cell_range(sheet, f'I{row_number}:J{row_number}', currency_format)  # Tax, Subtotal
+    format_cell_range(sheet, f'F{row_number}', currency_format)  # Tax
+    format_cell_range(sheet, f'H{row_number}:I{row_number}', currency_format)  # SGST, CGST
 
     # Success message
     if data.get("merchant") == "Manual Review Needed" or data.get("total", 0) == 0:
