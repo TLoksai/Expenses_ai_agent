@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import warnings
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters, ContextTypes
 from groq import Groq
@@ -10,6 +11,9 @@ from oauth2client.service_account import ServiceAccountCredentials
 from gspread_formatting import *
 
 warnings.filterwarnings('ignore')  # Suppress warnings
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Load from environment variables
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
