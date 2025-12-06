@@ -1,5 +1,5 @@
 groq
-python-telegram-bot==20.8
+python-telegram-bot
 gspread
 oauth2client
 gspread-formatting

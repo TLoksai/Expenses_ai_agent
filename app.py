@@ -23,10 +23,12 @@ client = Groq(api_key=GROQ_API_KEY)
 # Google Sheets Setup
 scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
 credentials_json = os.environ.get('CREDENTIALS_JSON')
-if not credentials_json:
-    raise ValueError("CREDENTIALS_JSON must be set as environment variable with the service account JSON")
-creds_dict = json.loads(credentials_json)
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+if credentials_json:
+    creds_dict = json.loads(credentials_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+else:
+    # For local testing, use credentials.json file
+    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
 gc = gspread.authorize(creds)
 sheet = gc.open("My Expenses 2025").sheet1
 
@@ -66,7 +68,7 @@ if current_headers != headers:
     set_column_width(sheet, 'I:K', 100)  # Tax, Subtotal, Receipt#
     set_column_width(sheet, 'L', 200)  # Image Link
 
-print("✅ CONNECTED & HEADERS SET WITH FORMATTING!")
+print("CONNECTED & HEADERS SET WITH FORMATTING!")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -399,6 +401,6 @@ conv_handler = ConversationHandler(
 app.add_handler(CommandHandler("start", start))
 app.add_handler(conv_handler)
 
-print("🚀 ENHANCED BOT READY WITH INVESTOR TRACKING!")
-print("📱 Open Telegram and send a receipt (photo/file - JPG/PNG/PDF/WEBP)!")
+print("ENHANCED BOT READY WITH INVESTOR TRACKING!")
+print("Open Telegram and send a receipt (photo/file - JPG/PNG/PDF/WEBP)!")
 app.run_polling(drop_pending_updates=True)
