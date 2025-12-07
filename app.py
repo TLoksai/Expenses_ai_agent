@@ -444,11 +444,17 @@ application.add_handler(conv_handler)
 @flask_app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        update = Update.de_json(request.get_json(force=True), application.bot)
+        json_data = request.get_json(force=True)
+        if not json_data:
+            return jsonify(error="No JSON"), 400
+
+        update = Update.de_json(json_data, application.bot)  # <-- THIS IS THE KEY
         asyncio.run(application.process_update(update))
         return jsonify(success=True)
     except Exception as e:
-        print(f"Webhook error: {e}")
+        print(f"WEBHOOK ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify(error=str(e)), 500
 
 @flask_app.route('/health', methods=['GET'])
