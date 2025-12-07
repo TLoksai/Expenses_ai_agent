@@ -5,6 +5,7 @@ import warnings
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters, ContextTypes
+from flask import Flask, request
 from groq import Groq
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
@@ -421,7 +422,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # Build application
-app = Application.builder().token(TELEGRAM_TOKEN).build()
+telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
 
 # Conversation handler
 conv_handler = ConversationHandler(
@@ -436,8 +437,18 @@ conv_handler = ConversationHandler(
     fallbacks=[CommandHandler('cancel', cancel)]
 )
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(conv_handler)
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(conv_handler)
+
+# Flask app for webhook
+flask_app = Flask(__name__)
+
+@flask_app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    update = Update.de_json(data, telegram_app.bot)
+    telegram_app.process_update(update)
+    return 'ok', 200
 
 # Check if running on Render (production) or locally
 WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
@@ -446,14 +457,9 @@ PORT = int(os.environ.get('PORT', 5000))
 if WEBHOOK_URL:
     # Production: Use webhooks
     print("Running in webhook mode for production")
-    app.run_webhook(
-        listen='0.0.0.0',
-        port=PORT,
-        url_path='webhook',
-        webhook_url=f'{WEBHOOK_URL}/webhook',
-        drop_pending_updates=True
-    )
+    telegram_app.bot.set_webhook(url=f'{WEBHOOK_URL}/webhook')
+    flask_app.run(host='0.0.0.0', port=PORT)
 else:
     # Local development: Use polling
     print("No WEBHOOK_URL found, running in polling mode for local development")
-    app.run_polling(drop_pending_updates=True)
+    telegram_app.run_polling(drop_pending_updates=True)
