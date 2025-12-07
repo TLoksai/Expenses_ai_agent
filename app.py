@@ -445,16 +445,14 @@ application.add_handler(conv_handler)
 def webhook():
     try:
         update = Update.de_json(request.get_json(force=True), application.bot)
-        # Run async update in existing event loop (no asyncio.run!)
-        import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(application.process_update(update))
-        else:
-            loop.run_until_complete(application.process_update(update))
+        # THIS LINE FIXES THE EVENT LOOP ERROR IN THREADS
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(application.process_update(update))
+        loop.close()
         return jsonify(success=True)
     except Exception as e:
-        print("ERROR:", e)
+        print("WEBHOOK ERROR:", e)
         import traceback
         traceback.print_exc()
         return jsonify(error=str(e)), 500
