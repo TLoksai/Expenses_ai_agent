@@ -55,32 +55,19 @@ Railway is recommended for easy deployment of this bot.
     - Railway will build and deploy automatically
     - The bot will start running 24/7
 
-### Render
+### Render (Current Deployment)
 
-For Render deployment:
+Successfully deployed on Render.com:
 
-1. **Create a GitHub Repository:**
-    - Create a new repo on GitHub
-    - Push this code to the repo
+- **Service URL**: https://expenses_ai_agent-5.onrender.com
+- **Status**: Live with webhook mode for 24/7 operation
+- **Environment Variables Set**:
+  - `GROQ_API_KEY`
+  - `TELEGRAM_TOKEN`
+  - `CREDENTIALS_JSON`
+  - `WEBHOOK_URL` = https://expenses_ai_agent-5.onrender.com
 
-2. **Deploy on Render:**
-    - Go to [Render.com](https://render.com) and sign up/login
-    - Click "New +" > "Web Service"
-    - Connect your GitHub account and select the repo
-    - Set build command: `pip install -r requirements.txt`
-    - Set start command: `python app.py`
-
-3. **Set Environment Variables in Render:**
-    - In your Render service settings, go to Environment
-    - Add:
-      - `GROQ_API_KEY` = your_groq_api_key
-      - `TELEGRAM_TOKEN` = your_telegram_bot_token
-      - `CREDENTIALS_JSON` = paste the entire JSON content of your service account key file
-      - `WEBHOOK_URL` = https://your-service-name.onrender.com (replace with your actual Render URL)
-
-4. **Deploy:**
-    - Render will build and deploy automatically
-    - The bot will use webhooks instead of polling to avoid conflicts
+**Note**: The URL is a webhook endpoint (shows 404 for browsers) - users access the bot through Telegram.
 
 ## Local Testing
 
