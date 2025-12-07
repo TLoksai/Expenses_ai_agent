@@ -442,14 +442,19 @@ application.add_handler(conv_handler)
 
 # ==================== WEBHOOK (THIS IS WHAT FIXES EVERYTHING) ====================
 @flask_app.route('/webhook', methods=['POST'])
-async def webhook():
+def webhook():
     try:
-        json_data = request.get_json(force=True)
-        update = Update.de_json(json_data, application.bot)
-        await application.process_update(update)
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        # Run async update in existing event loop (no asyncio.run!)
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop.create_task(application.process_update(update))
+        else:
+            loop.run_until_complete(application.process_update(update))
         return jsonify(success=True)
     except Exception as e:
-        print("WEBHOOK ERROR:", e)
+        print("ERROR:", e)
         import traceback
         traceback.print_exc()
         return jsonify(error=str(e)), 500
@@ -462,19 +467,19 @@ def health():
 def home():
     return "Expense AI Bot is running! Use Telegram."
 
-# ==================== STARTUP (CRITICAL!) ====================
+# === START ===
 if __name__ == "__main__":
+    # Initialize and start the bot properly
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(application.initialize())
+    loop.run_until_complete(application.start())
+    
+    # Set webhook
+    webhook_url = f"https://expenses-ai-agent-6.onrender.com/webhook"
+    loop.run_until_complete(application.bot.set_webhook(url=webhook_url))
+    print(f"WEBHOOK SET: {webhook_url}")
+
+    # Run Flask
     port = int(os.environ.get("PORT", 10000))
-
-    # THIS IS THE MAGIC LINE THAT FIXES THE ERROR
-    asyncio.run(application.initialize())
-    asyncio.run(application.start())
-    asyncio.run(application.updater.start_webhook(
-        listen="0.0.0.0",
-        port=port,
-        url_path="/webhook",
-        webhook_url=f"https://expenses-ai-agent-6.onrender.com/webhook"
-    ))
-
-    print("BOT IS FULLY LIVE 24/7!")
     flask_app.run(host="0.0.0.0", port=port)
