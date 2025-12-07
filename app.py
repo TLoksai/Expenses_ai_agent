@@ -2,30 +2,30 @@ import os
 import json
 import base64
 import warnings
-from dotenv import load_dotenv
+import asyncio
+from flask import Flask, request, jsonify
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ConversationHandler, filters, ContextTypes
-from flask import Flask, request
 from groq import Groq
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from gspread_formatting import *
 
-warnings.filterwarnings('ignore')  # Suppress warnings
+warnings.filterwarnings('ignore')
 
-# Load environment variables from .env file
-load_dotenv()
+# ==================== FLASK SERVER ====================
+flask_app = Flask(__name__)
 
-# Load from environment variables
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
-TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+# ==================== KEYS ====================
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 
 if not GROQ_API_KEY or not TELEGRAM_TOKEN:
-    raise ValueError("GROQ_API_KEY and TELEGRAM_TOKEN must be set as environment variables")
+    raise ValueError("Set GROQ_API_KEY and TELEGRAM_TOKEN in Render")
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# Google Sheets Setup
+# ==================== GOOGLE SHEETS ====================
 scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
 credentials_json = os.environ.get('CREDENTIALS_JSON')
 if credentials_json:
@@ -421,8 +421,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ Operation cancelled. Upload a receipt to start again!")
     return ConversationHandler.END
 
-# Build application
-telegram_app = Application.builder().token(TELEGRAM_TOKEN).build()
+# ==================== TELEGRAM APP ====================
+application = Application.builder().token(TELEGRAM_TOKEN).build()
 
 # Conversation handler
 conv_handler = ConversationHandler(
@@ -437,29 +437,32 @@ conv_handler = ConversationHandler(
     fallbacks=[CommandHandler('cancel', cancel)]
 )
 
-telegram_app.add_handler(CommandHandler("start", start))
-telegram_app.add_handler(conv_handler)
+application.add_handler(CommandHandler("start", start))
+application.add_handler(conv_handler)
 
-# Flask app for webhook
-flask_app = Flask(__name__)
-
+# ==================== WEBHOOK (THIS IS WHAT FIXES EVERYTHING) ====================
 @flask_app.route('/webhook', methods=['POST'])
 def webhook():
-    data = request.get_json()
-    update = Update.de_json(data, telegram_app.bot)
-    telegram_app.process_update(update)
-    return 'ok', 200
+    try:
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        asyncio.run(application.process_update(update))
+        return jsonify(success=True)
+    except Exception as e:
+        print(f"Webhook error: {e}")
+        return jsonify(error=str(e)), 500
 
-# Check if running on Render (production) or locally
-WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
-PORT = int(os.environ.get('PORT', 5000))
+@flask_app.route('/health', methods=['GET'])
+def health():
+    return jsonify(status="healthy", bot="running")
 
-if WEBHOOK_URL:
-    # Production: Use webhooks
-    print("Running in webhook mode for production")
-    telegram_app.bot.set_webhook(url=f'{WEBHOOK_URL}/webhook')
-    flask_app.run(host='0.0.0.0', port=PORT)
-else:
-    # Local development: Use polling
-    print("No WEBHOOK_URL found, running in polling mode for local development")
-    telegram_app.run_polling(drop_pending_updates=True)
+@flask_app.route('/', methods=['GET'])
+def home():
+    return "Expense AI Bot is running! Use Telegram."
+
+# ==================== START FLASK (NOT run_webhook!) ====================
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    print(f"STARTING FLASK SERVER ON PORT {port}")
+    print("HEALTH: https://expenses-ai-agent-6.onrender.com/health")
+    print("WEBHOOK: https://expenses-ai-agent-6.onrender.com/webhook")
+    flask_app.run(host='0.0.0.0', port=port)
